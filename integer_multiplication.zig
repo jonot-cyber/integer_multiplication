@@ -1,5 +1,9 @@
 const std = @import("std");
 
+// In theory, this should be true to insure better results
+// In practice, it gives you the same value as if its false
+const thorough = false;
+
 const Cost = struct {
     // 0 if cost undefined
     n: u16 = 0,
@@ -53,6 +57,20 @@ fn calcTerm(n: u16) void {
             shortcut_cost.made.set(n);
             insertCost(n, shortcut_cost);
         }
+        if (thorough) {
+            for (1..n) |shortcut_i| {
+                if (costs[larger].by_term[shortcut_i].n == 0) continue;
+                var shortcut_cost = Cost{
+                    .n = n,
+                    .value = costs[larger].by_term[shortcut_i].value + costs[smaller].lowest.value + 1,
+                    .larger = &costs[larger].by_term[shortcut_i],
+                    .smaller = &costs[smaller].lowest,
+                    .made = costs[larger].by_term[shortcut_i].made.unionWith(costs[smaller].lowest.made),
+                };
+                shortcut_cost.made.set(n);
+                insertCost(n, shortcut_cost);
+            }
+        }
     }
 }
 
@@ -83,6 +101,21 @@ fn negativePass(n: u16) void {
             };
             shortcut_cost.made.set(n);
             insertCost(n, shortcut_cost);
+        }
+        if (thorough) {
+            for (1..n) |shortcut_i| {
+                if (costs[@intCast(larger)].by_term[shortcut_i].n == 0) continue;
+                var shortcut_cost = Cost{
+                    .n = n,
+                    .value = costs[@intCast(larger)].by_term[shortcut_i].value + costs[@abs(smaller)].lowest.value + 1,
+                    .negative = true,
+                    .larger = &costs[@intCast(larger)].by_term[shortcut_i],
+                    .smaller = &costs[@abs(smaller)].lowest,
+                    .made = costs[@intCast(larger)].by_term[shortcut_i].made.unionWith(costs[@abs(smaller)].lowest.made),
+                };
+                shortcut_cost.made.set(n);
+                insertCost(n, shortcut_cost);
+            }
         }
     }
 }
@@ -140,22 +173,21 @@ fn printPath(cost: *const Cost) !void {
     }
 }
 
-// 2307
-// 2139
-// 2105
 pub fn main() !void {
     buildOne();
     const out = std.io.getStdOut().writer();
-    var sum: u16 = 0;
     for (2..256) |i| {
         calcTerm(@intCast(i));
     }
     for (0..2) |_| {
-        sum = 0;
         for (2..256) |i| {
             negativePass(@intCast(i));
-            sum += costs[i].lowest.value;
         }
     }
-    try out.print("{d}\n", .{sum});
+    try printPath(&costs[233].lowest);
+    for (costs, 0..) |cost, i| {
+        if (i < 2) continue;
+        if (cost.lowest.value < 11) continue;
+        try out.print("{d}: {d}\n", .{i, cost.lowest.value});
+    }
 }
